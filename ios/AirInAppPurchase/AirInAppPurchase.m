@@ -91,18 +91,17 @@ void *AirInAppRefToSelf;
     }
     
     [dictionary setObject:productElement forKey:@"details"];
-    
-    
-    NSString* jsonDictionary = [dictionary JSONString];
-    
+    NSData *jsonDictionaryData = [NSJSONSerialization dataWithJSONObject:dictionary options:0 error:nil];
+    NSString *jsonDictionary = [[NSString alloc] initWithData:jsonDictionaryData encoding:NSUTF8StringEncoding];
     FREDispatchStatusEventAsync(AirInAppCtx ,(uint8_t*) "PRODUCT_INFO_RECEIVED", (uint8_t*) [jsonDictionary UTF8String] );
-    
+    [jsonDictionary release];
+
     if ([response invalidProductIdentifiers] != nil && [[response invalidProductIdentifiers] count] > 0)
     {
-        NSString* jsonArray = [[response invalidProductIdentifiers] JSONString];
-        
+        NSData *jsonArrayData = [NSJSONSerialization dataWithJSONObject:[response invalidProductIdentifiers] options:0 error:nil];
+        NSString *jsonArray = [[NSString alloc] initWithData:jsonArrayData encoding:NSUTF8StringEncoding];
         FREDispatchStatusEventAsync(AirInAppCtx ,(uint8_t*) "PRODUCT_INFO_ERROR", (uint8_t*) [jsonArray UTF8String] );
-        
+        [jsonArray release];
     }
 }
 
@@ -136,8 +135,11 @@ void *AirInAppRefToSelf;
     NSString* receiptString = [[[NSString alloc] initWithData:transaction.transactionReceipt encoding:NSUTF8StringEncoding] autorelease];
     [data setValue:receiptString forKey:@"receipt"];
     [data setValue:@"AppStore"   forKey:@"receiptType"];
-    
-    FREDispatchStatusEventAsync(AirInAppCtx, (uint8_t*)"PURCHASE_SUCCESSFUL", (uint8_t*)[[data JSONString] UTF8String]); 
+
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:data options:0 error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    FREDispatchStatusEventAsync(AirInAppCtx, (uint8_t*)"PURCHASE_SUCCESSFUL", (uint8_t*)[jsonString UTF8String]);
+    [jsonString release];
 }
 
 // transaction failed, remove the transaction from the queue.
@@ -154,15 +156,18 @@ void *AirInAppRefToSelf;
     [data setValue:[[transaction error] localizedFailureReason] forKey:@"FailureReason"];
     [data setValue:[[transaction error] localizedDescription] forKey:@"FailureDescription"];
     [data setValue:[[transaction error] localizedRecoverySuggestion] forKey:@"RecoverySuggestion"];
-    
-    NSString *error = transaction.error.code == SKErrorPaymentCancelled ? @"RESULT_USER_CANCELED" : [data JSONString];
-    
+
+    NSData *jsonData = [NSJSONSerialization dataWithJSONObject:data options:0 error:nil];
+    NSString *jsonString = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    NSString *error = transaction.error.code == SKErrorPaymentCancelled ? @"RESULT_USER_CANCELED" : jsonString;
+
     // conclude the transaction
     [[SKPaymentQueue defaultQueue] finishTransaction:transaction];
-    
+
     // dispatch event
     FREDispatchStatusEventAsync(AirInAppCtx, (uint8_t*)"PURCHASE_ERROR", (uint8_t*) [error UTF8String]);
-    
+    [jsonString release];
+
 }
 
 // transaction is being purchasing, logging the info.
